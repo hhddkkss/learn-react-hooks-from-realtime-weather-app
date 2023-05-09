@@ -129,6 +129,7 @@ const Refresh = styled.div`
     height: auto;
     margin-left: 10px;
     animation: rotate infinite 1.5s linear;
+    ${"" /* {isLoading} 是因為要從父元件解構 */}
     animation-duration: ${({ isLoading }) => (isLoading ? "1.5s" : "0s")};
   }
 
@@ -144,20 +145,127 @@ const Refresh = styled.div`
 const DayCloudy = styled(DayCloudyIcon)`
   flex-basis: 30%;
 `;
+//-----------------------------------function------------------------------------------
+const fetchCurrentWeather = () => {
 
+  const myLocationName = "石碇";
+  //氣象觀測資料
+  return axios
+    .get(WEATHER + OBSERVE, {
+      params: {
+        Authorization: AUTH,
+        locationName: myLocationName,
+      },
+    })
+    .then((res) => {
+      const locationData = res.data.records.location[0];
+
+      const weatherElements = locationData.weatherElement.reduce(
+        (myWeatherElement, item) => {
+          if (["WDSD", "TEMP"].includes(item.elementName)) {
+            myWeatherElement[item.elementName] = item.elementValue;
+          }
+
+          return myWeatherElement;
+        },
+        {}
+      );
+
+      return {
+        locationName: locationData.locationName,
+        windSpeed: weatherElements.WDSD,
+        temperature: weatherElements.TEMP,
+        observationTime: locationData.time.obsTime,
+      };
+
+      // fetch(
+      //   WEATHER +
+      //     OBSERVE +
+      //     "?Authorization=" +
+      //     AUTH +
+      //     "&locationName=" +
+      //     myLocationName
+      // )
+      //   .then((r) => r.json())
+      //   .then((data) => {
+      //     const {
+      //       records: { location },
+      //     } = data;
+
+      //     console.log(location);
+      //   });
+    })
+    .catch((e) => console.log(e, 111));
+};
+
+function fetchWeatherForecast() {
+  //三十六小時天氣預報
+  const myCity = "新北市";
+  return axios
+    .get(WEATHER + TWO_DAY, {
+      params: {
+        Authorization: AUTH,
+        locationName: myCity,
+      },
+    })
+    .then((res2) => {
+      const locationInfo = res2.data.records.location[0].weatherElement;
+
+      const myData = locationInfo.filter((v) => {
+        return ["Wx", "PoP", "CI"].includes(v.elementName);
+      });
+
+      return {
+        description: myData[0].time[0].parameter.parameterName,
+        weatherCode: myData[0].time[0].parameter.parameterValue,
+        rainPossibility: myData[1].time[0].parameter.parameterName,
+        comfortable: myData[2].time[0].parameter.parameterName,
+      };
+    })
+    .catch((e) => console.log(e, 222));
+}
+
+//-----------------------------------function------------------------------------------
 function App() {
   //-----------------------------------state---------------------------------------------
   const [currentTheme, setCurrentTheme] = useState("light");
-  const [currentWeather, setCurrentWeather] = useState({
-    locationName: "台北市",
-    description: "多雲時晴",
-    windSpeed: "1.1",
-    temperature: 22.9,
-    rainPossibility: 48.3,
-    observationTime: "2020-12-12 22:10:00",
+  const [weatherElement, setWeatherElement] = useState({
+    locationName: "",
+    description: "",
+    windSpeed: 0,
+    temperature: 0,
+    rainPossibility: 0,
+    observationTime: new Date(),
+    comfortable: "",
     isLoading: true,
   });
+
   //-----------------------------------state---------------------------------------------
+
+  //-----------------------------------useEffect-----------------------------------------
+  useEffect(() => {
+    //同時請求多個 api的話 建議把它變成並發請求 會是更好的選擇 可以最小延遲的加載頁面
+
+    //useEffect 處理api 處理完在 setState
+    const fetchData = async () => {
+      const data = await axios.all([
+        fetchCurrentWeather(),
+        fetchWeatherForecast(),
+      ]);
+
+      const [currentWeather, weatherForecast] = data;
+
+      setWeatherElement({
+        ...currentWeather,
+        ...weatherForecast,
+        isLoading: false,
+      });
+    };
+
+    fetchData();
+  }, []);
+
+  //-----------------------------------useEffect-----------------------------------------
 
   //解構出來可以讓程式碼更整潔
   const {
@@ -168,121 +276,35 @@ function App() {
     temperature,
     windSpeed,
     locationName,
-  } = currentWeather;
-
-  //-----------------------------------function------------------------------------------
-  const fetchCurrentWeather = async () => {
-    setCurrentWeather({ ...currentWeather, isLoading: true });
-    const myLocationName = "深坑";
-    //氣象觀測資料
-    const res = await axios
-      .get(WEATHER + OBSERVE, {
-        params: {
-          Authorization: AUTH,
-          locationName: myLocationName,
-        },
-      })
-      .catch((e) => console.log(e, 111));
-
-    const locationData = res.data.records.location[0];
-
-    const weatherElement = locationData.weatherElement.reduce(
-      (myWeatherElement, item) => {
-        if (["WDSD", "TEMP"].includes(item.elementName)) {
-          myWeatherElement[item.elementName] = item.elementValue;
-        }
-
-        return myWeatherElement;
-      },
-      {}
-    );
-    setCurrentWeather({
-      ...currentWeather,
-      locationName: locationData.locationName,
-      windSpeed: weatherElement.WDSD,
-      temperature: weatherElement.TEMP,
-      observationTime: locationData.time.obsTime,
-      isLoading: true,
-    });
-
-    //三十六小時天氣預報
-
-    const myCity = "新北市";
-    const res2 = await axios
-      .get(WEATHER + TWO_DAY, {
-        params: {
-          Authorization: AUTH,
-          locationName: myCity,
-        },
-      })
-      .catch((e) => console.log(e, 222));
-
-    const locationInfo = res2.data.records.location[0].weatherElement;
-
-    const myData = locationInfo.filter((v) => {
-      return ["Wx", "PoP"].includes(v.elementName);
-    });
-
-    setCurrentWeather({
-      ...currentWeather,
-      description: myData[0].time[0].parameter.parameterName,
-      rainPossibility: myData[1].time[0].parameter.parameterName,
-      isLoading: false,
-    });
-
-    // fetch(
-    //   WEATHER +
-    //     OBSERVE +
-    //     "?Authorization=" +
-    //     AUTH +
-    //     "&locationName=" +
-    //     myLocationName
-    // )
-    //   .then((r) => r.json())
-    //   .then((data) => {
-    //     const {
-    //       records: { location },
-    //     } = data;
-
-    //     console.log(location);
-    //   });
-  };
-
-  //-----------------------------------function------------------------------------------
-  //-----------------------------------useEffect-----------------------------------------
-  useEffect(() => {
-    fetchCurrentWeather();
-  }, []);
-
-  //-----------------------------------useEffect-----------------------------------------
+    comfortable,
+  } = weatherElement;
 
   return (
     <ThemeProvider theme={theme[currentTheme]}>
       <Container>
         <WeatherCard>
-          {console.log("render isLoading:" + currentWeather.isLoading)}
-          <Location>{currentWeather.locationName}</Location>
-          <Description>{currentWeather.description}</Description>
+          <Location>{locationName}</Location>
+          <Description>
+            {description} {comfortable}
+          </Description>
           <CurrentWeather>
             <Temperature>
-              {Math.round(currentWeather.temperature)}
+              {Math.round(temperature)}
               <Celsius>°C</Celsius>
             </Temperature>
             <DayCloudy></DayCloudy>
           </CurrentWeather>
           <AirFlow>
             <AirFlowIcon></AirFlowIcon>
-            {currentWeather.windSpeed} m/h
+            {windSpeed} m/h
           </AirFlow>
           <Rain>
             <RainIcon></RainIcon>
-            {currentWeather.rainPossibility}%
+            {rainPossibility}%
           </Rain>
           <Refresh onClick={fetchCurrentWeather} isLoading={isLoading}>
             最後觀測時間：
-            {dayjs(currentWeather.observationTime)
-              .locale("zh-tw")
-              .format("a hh:mm")}
+            {dayjs(observationTime).locale("zh-tw").format("a hh:mm")}
             {isLoading ? <LoadingIcon /> : <RefreshIcon />}
           </Refresh>
         </WeatherCard>
