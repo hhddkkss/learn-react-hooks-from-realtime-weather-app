@@ -1,14 +1,14 @@
 //套件模組
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 //載入 emotion 的 styled套件
 import styled from "@emotion/styled";
+//第二種 載入themeProvider 來使用主題色 就不用一個一個傳 props下去
+import { ThemeProvider } from "@emotion/react";
 import dayjs from "dayjs";
 import "dayjs/locale/zh-tw";
 import axios from "axios";
-//第二種 載入themeProvider 來使用主題色 就不用一個一個傳 props下去
-import { ThemeProvider } from "@emotion/react";
 
-import { ReactComponent as DayCloudyIcon } from "./images/day-cloudy.svg";
+import WeatherIcon from "./components/WeatherIcon";
 import { ReactComponent as RainIcon } from "./images/rain.svg";
 import { ReactComponent as AirFlowIcon } from "./images/airFlow.svg";
 import { ReactComponent as RefreshIcon } from "./images/refresh.svg";
@@ -20,6 +20,9 @@ import "normalize.css"; //把不同瀏覽器預設樣式變成一樣
 
 // API
 import { WEATHER, AUTH, TWO_DAY, OBSERVE } from "./Api/weather.js";
+
+// utils
+import { getMoment } from "./utils/helpers";
 
 //-----------------------------------主題配色------------------------------------------
 const theme = {
@@ -132,7 +135,6 @@ const Refresh = styled.div`
     ${"" /* {isLoading} 是因為要從父元件解構 */}
     animation-duration: ${({ isLoading }) => (isLoading ? "1.5s" : "0s")};
   }
-
   @keyframes rotate {
     from {
       transform: rotate(360deg);
@@ -142,13 +144,10 @@ const Refresh = styled.div`
     }
   }
 `;
-const DayCloudy = styled(DayCloudyIcon)`
-  flex-basis: 30%;
-`;
+const myLocationName = "石碇";
+const myCity = "新北市";
 //-----------------------------------function------------------------------------------
 const fetchCurrentWeather = () => {
-
-  const myLocationName = "石碇";
   //氣象觀測資料
   return axios
     .get(WEATHER + OBSERVE, {
@@ -177,30 +176,13 @@ const fetchCurrentWeather = () => {
         temperature: weatherElements.TEMP,
         observationTime: locationData.time.obsTime,
       };
-
-      // fetch(
-      //   WEATHER +
-      //     OBSERVE +
-      //     "?Authorization=" +
-      //     AUTH +
-      //     "&locationName=" +
-      //     myLocationName
-      // )
-      //   .then((r) => r.json())
-      //   .then((data) => {
-      //     const {
-      //       records: { location },
-      //     } = data;
-
-      //     console.log(location);
-      //   });
     })
     .catch((e) => console.log(e, 111));
 };
 
 function fetchWeatherForecast() {
   //三十六小時天氣預報
-  const myCity = "新北市";
+
   return axios
     .get(WEATHER + TWO_DAY, {
       params: {
@@ -228,7 +210,7 @@ function fetchWeatherForecast() {
 //-----------------------------------function------------------------------------------
 function App() {
   //-----------------------------------state---------------------------------------------
-  const [currentTheme, setCurrentTheme] = useState("light");
+  const [currentTheme, setCurrentTheme] = useState("dark");
   const [weatherElement, setWeatherElement] = useState({
     locationName: "",
     description: "",
@@ -240,30 +222,50 @@ function App() {
     isLoading: true,
   });
 
+  const moment = useMemo(() => getMoment(myCity), []);
+
   //-----------------------------------state---------------------------------------------
+  //-----------------------------------function------------------------------------------
+
+  //同時請求多個 api的話 建議把它變成並發請求 會是更好的選擇 可以最小延遲的加載頁面
+  //useEffect 處理api 處理完在 setState
+  //不要定義在useEffect內 拉到外面 可以讓重新整理的按鈕也使用fetchData這個 function
+
+  /**
+   *  當react 內的資料狀態有變動時 整個用來產生react元件的function 都會重新執行一次
+   *
+   */
+  const fetchData = useCallback(async () => {
+    setWeatherElement((prev) => ({
+      ...prev,
+      isLoading: true,
+    }));
+
+    const data = await axios.all([
+      fetchCurrentWeather(),
+      fetchWeatherForecast(),
+    ]);
+
+    const [currentWeather, weatherForecast] = data;
+
+    setWeatherElement({
+      ...currentWeather,
+      ...weatherForecast,
+      isLoading: false,
+    });
+  }, []);
+
+  //-----------------------------------function------------------------------------------
 
   //-----------------------------------useEffect-----------------------------------------
   useEffect(() => {
-    //同時請求多個 api的話 建議把它變成並發請求 會是更好的選擇 可以最小延遲的加載頁面
-
-    //useEffect 處理api 處理完在 setState
-    const fetchData = async () => {
-      const data = await axios.all([
-        fetchCurrentWeather(),
-        fetchWeatherForecast(),
-      ]);
-
-      const [currentWeather, weatherForecast] = data;
-
-      setWeatherElement({
-        ...currentWeather,
-        ...weatherForecast,
-        isLoading: false,
-      });
-    };
-
+    console.log("useEffect render");
     fetchData();
-  }, []);
+  }, [fetchData]);
+
+  useEffect(() => {
+    setCurrentTheme(moment === "day" ? "light" : "dark");
+  }, [moment]);
 
   //-----------------------------------useEffect-----------------------------------------
 
@@ -277,10 +279,12 @@ function App() {
     windSpeed,
     locationName,
     comfortable,
+    weatherCode,
   } = weatherElement;
 
   return (
     <ThemeProvider theme={theme[currentTheme]}>
+      {console.log(weatherElement)}
       <Container>
         <WeatherCard>
           <Location>{locationName}</Location>
@@ -292,7 +296,7 @@ function App() {
               {Math.round(temperature)}
               <Celsius>°C</Celsius>
             </Temperature>
-            <DayCloudy></DayCloudy>
+            <WeatherIcon weatherCode={weatherCode} moment={moment} />
           </CurrentWeather>
           <AirFlow>
             <AirFlowIcon></AirFlowIcon>
@@ -302,7 +306,7 @@ function App() {
             <RainIcon></RainIcon>
             {rainPossibility}%
           </Rain>
-          <Refresh onClick={fetchCurrentWeather} isLoading={isLoading}>
+          <Refresh onClick={fetchData} isLoading={isLoading}>
             最後觀測時間：
             {dayjs(observationTime).locale("zh-tw").format("a hh:mm")}
             {isLoading ? <LoadingIcon /> : <RefreshIcon />}
