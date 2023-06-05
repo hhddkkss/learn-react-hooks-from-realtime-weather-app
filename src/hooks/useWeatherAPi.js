@@ -4,7 +4,7 @@ import axios from "axios";
 import { WEATHER, AUTH, TWO_DAY, OBSERVE } from "./../Api/weather.js";
 
 //-----------------------------------function------------------------------------------
-const fetchCurrentWeather = ({ myLocationName }) => {
+const fetchCurrentWeather = (myLocationName) => {
   //氣象觀測資料
   return axios
     .get(WEATHER + OBSERVE, {
@@ -14,7 +14,9 @@ const fetchCurrentWeather = ({ myLocationName }) => {
       },
     })
     .then((res) => {
-      const locationData = res.data.records.location[0];
+      const locationData = res.data.records.location.find(
+        (location) => location.locationName === myLocationName
+      );
 
       const weatherElements = locationData.weatherElement.reduce(
         (myWeatherElement, item) => {
@@ -35,11 +37,11 @@ const fetchCurrentWeather = ({ myLocationName }) => {
       };
     })
     .catch((e) => {
-      throw new Error(`找不到${e}的資料`);
+      throw new Error(`參數為：${myLocationName}找不到${e}的資料`);
     });
 };
 
-function fetchWeatherForecast({ myCity }) {
+function fetchWeatherForecast(myCity) {
   //三十六小時天氣預報
   return axios
     .get(WEATHER + TWO_DAY, {
@@ -69,7 +71,7 @@ function fetchWeatherForecast({ myCity }) {
 
 //-----------------------------------function------------------------------------------
 
-const useWeatherAPi = ({ myLocationName, myCity }) => {
+const useWeatherAPi = ({ locationName, cityName }) => {
   const [weatherElement, setWeatherElement] = useState({
     locationName: "",
     description: "",
@@ -88,8 +90,8 @@ const useWeatherAPi = ({ myLocationName, myCity }) => {
     }));
 
     const data = await axios.all([
-      fetchCurrentWeather({ myLocationName }),
-      fetchWeatherForecast({ myCity }),
+      fetchCurrentWeather(locationName),
+      fetchWeatherForecast(cityName),
     ]);
 
     const [currentWeather, weatherForecast] = data;
@@ -99,7 +101,7 @@ const useWeatherAPi = ({ myLocationName, myCity }) => {
       ...weatherForecast,
       isLoading: false,
     });
-  }, []);
+  }, [cityName, locationName]);
 
   useEffect(() => {
     fetchData();

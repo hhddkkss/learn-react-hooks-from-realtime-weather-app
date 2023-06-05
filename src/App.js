@@ -61,13 +61,25 @@ function App() {
     setCurrentPage(currentPage);
   };
 
-  const [currentCity, setCurrentCity] = useState("新北市");
+  // method 1.可以這樣寫
+  // const storedCity = localStorage.getItem("cityName") || "新北市";
+
+  // const [currentCity, setCurrentCity] = useState(storedCity);
+
+  // method 2. 可以在 useState 中放入一個函式 函式的回傳值會等於state的預設值
+
+  const [currentCity, setCurrentCity] = useState(
+    () => localStorage.getItem("cityName") || "新北市"
+  );
+
+  const handleCurrentCityChange = (currentCity) => {
+    setCurrentCity(currentCity);
+  };
 
   const currentLocation = useMemo(
     () => findLocation(currentCity),
     [currentCity]
   );
-
   // {
   //   cityName: "新北市",
   //   locationName: "板橋",
@@ -97,7 +109,11 @@ function App() {
           />
         )}
         {currentPage === "WeatherSetting" && (
-          <WeatherSetting handleCurrentPageChange={handleCurrentPageChange} />
+          <WeatherSetting
+            handleCurrentPageChange={handleCurrentPageChange}
+            handleCurrentCityChange={handleCurrentCityChange}
+            cityName={cityName}
+          />
         )}
       </Container>
     </ThemeProvider>
