@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import axios from "axios";
 // API
-import { WEATHER, AUTH, TWO_DAY, OBSERVE } from "./../Api/weather.js";
+import { WEATHER, TWO_DAY, OBSERVE } from "./../Api/weather.js";
 
 //-----------------------------------function------------------------------------------
 const fetchCurrentWeather = (myLocationName) => {
@@ -9,7 +9,7 @@ const fetchCurrentWeather = (myLocationName) => {
   return axios
     .get(WEATHER + OBSERVE, {
       params: {
-        Authorization: AUTH,
+        Authorization: process.env.REACT_APP_API_AUTHORIZATION_KEY,
         locationName: myLocationName,
       },
     })
@@ -46,7 +46,7 @@ function fetchWeatherForecast(myCity) {
   return axios
     .get(WEATHER + TWO_DAY, {
       params: {
-        Authorization: AUTH,
+        Authorization: process.env.REACT_APP_API_AUTHORIZATION_KEY,
         locationName: myCity,
       },
     })
